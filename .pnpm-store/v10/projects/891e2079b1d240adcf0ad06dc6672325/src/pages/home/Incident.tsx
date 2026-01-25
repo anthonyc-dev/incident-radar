@@ -73,7 +73,7 @@ const ITEMS_PER_PAGE = 10;
 const SEVERITY_OPTIONS: IncidentSeverity[] = ["LOW", "MEDIUM", "HIGH"];
 const STATUS_OPTIONS: IncidentStatus[] = ["OPEN", "INVESTIGATING", "RESOLVED"];
 
-const Incident = () => {
+const IncidentPage = () => {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -843,4 +843,4 @@ const Incident = () => {
   );
 };
 
-export default Incident;
+export default IncidentPage;

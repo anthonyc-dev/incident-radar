@@ -4,7 +4,7 @@ import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
 import Activity from "@/pages/home/Activity";
 import Dashboard from "@/pages/home/dashboard/Dashboard";
-import Incident from "@/pages/home/Incident";
+import IncidentPage from "@/pages/home/Incident";
 import NotFound from "@/pages/NotFound";
 import Unauthorize from "@/pages/Unauthorized";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
@@ -44,7 +44,7 @@ const AppRoutes: React.FC = () => {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="incidents" element={<Incident />} />
+        <Route path="incidents" element={<IncidentPage />} />
         <Route path="activity" element={<Activity />} />
         <Route path="*" element={<Unauthorize />} />
       </Route>
