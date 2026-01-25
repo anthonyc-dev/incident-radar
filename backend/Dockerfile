@@ -11,10 +11,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (dev + prod)
-# RUN npm ci
+RUN npm ci
 
 # Copy full source code
 COPY . .
+
+# Dummy DATABASE_URL for prisma generate (no .env in build; prisma.config uses it)
+ENV DATABASE_URL=postgresql://user:pass@localhost:5432/dummy
 
 # Generate Prisma client
 RUN npx prisma generate
@@ -32,27 +35,23 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install only production dependencies
+# Install production deps + Prisma CLI (needed for `prisma migrate deploy` via exec)
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && npm install prisma --no-save
 
-# Copy built application and Prisma artifacts
+# Copy built app and Prisma artifacts (migrations, schema, config for migrate deploy)
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/src/generated ./src/generated
 
-# Generate Prisma client in runtime
-RUN npx prisma generate
-
-# Create non-root user for security
+# Create non-root user and fix ownership
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 
 EXPOSE 3000
-
 
 CMD ["node", "dist/server.js"]
