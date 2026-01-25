@@ -1,7 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
-import type { IncidentSeverity, Prisma } from "../../generated/prisma/client.js";
-import type { ActivityLogEntry, CreateIncidentInput, GetIncidentsQuery, IncidentStatus, StatusHistoryEntry, UpdateIncidentInput, UpdateStatusInput } from "./incidents.types.js";
+import type { Prisma } from "../../generated/prisma/client.js";
+import type { ActivityLogEntry, CreateIncidentInput, GetIncidentsQuery, IncidentSeverity, IncidentStatus, StatusHistoryEntry, UpdateIncidentInput, UpdateStatusInput } from "./incidents.types.js";
 
 
 
