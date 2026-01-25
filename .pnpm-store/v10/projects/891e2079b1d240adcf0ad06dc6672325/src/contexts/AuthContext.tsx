@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
   }, []);
 
-  // Proactive token refresh on an interval
+  // Proactive token refresh on an intervals
   useEffect(() => {
     if (!user) return;
     const id = setInterval(() => {

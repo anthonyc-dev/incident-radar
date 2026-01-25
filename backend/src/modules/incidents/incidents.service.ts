@@ -330,7 +330,7 @@ export class IncidentsService {
 
       // Create activity log entry
       const activityType = newStatus === "RESOLVED" ? "RESOLVED" : "STATUS_CHANGED";
-      const description = newStatus === "RESOLVED" 
+      const description = newStatus === "RESOLVED"
         ? `Incident was resolved (status changed from ${oldStatus} to ${newStatus})`
         : `Status changed from ${oldStatus} to ${newStatus}`;
 
@@ -404,7 +404,7 @@ export class IncidentsService {
       throw new ApiError(404, "Incident not found", "INCIDENT_NOT_FOUND");
     }
 
-    // Get all activity logs
+    // Get all activity logss
     const activityLogs = await prisma.incidentActivityLogs.findMany({
       where: { incident_id: id },
       orderBy: { createdAt: "asc" },
