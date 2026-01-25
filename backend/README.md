@@ -20,7 +20,7 @@ docker builder prune -a
 
 ---
 
-# Feature/Module-Based Organization Backend file structure:
+# Feature/Module-Based Organization Backend file structures:
 
 ```
 backend/
