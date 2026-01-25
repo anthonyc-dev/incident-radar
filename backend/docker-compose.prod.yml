@@ -1,0 +1,147 @@
+
+services:
+  # ------------------ APP ------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: express_prod
+    ports:
+      - "3000:3000"
+      - "51212:51212"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - backend
+      - monitoring   
+    restart: always
+
+  # ------------------ REDIS ------------------
+  redis:
+    image: redis:8-alpine
+    container_name: redis_prod
+    command:
+      [
+        "redis-server",
+        "--appendonly", "yes",
+        "--appendfilename", "appendonly.aof",
+        "--requirepass", "${REDIS_PASSWORD}"     
+      ]
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    restart: always
+
+
+  # ------------------ POSTGRES ------------------
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_prod
+    env_file:
+      - .env
+    volumes:
+      - pg_prod_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ------------------ MONITORING ------------------
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-lifecycle"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - alertmanager
+    networks:
+      - monitoring
+    restart: always
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "4000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+    restart: always
+
+ # ---------------- LOGGER ----------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: elasticsearch_prod
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g 
+      - xpack.security.enabled=false 
+    volumes:
+      - es_data_prod:/usr/share/elasticsearch/data
+      - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/elasticsearch.yml:ro
+    ports:
+      - "9200:9200"
+    networks:
+      - monitoring
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: kibana_prod
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_HOST=0.0.0.0
+    volumes:
+      - ./elasticsearch/kibana.yml:/usr/share/kibana/elasticsearch/kibana.yml:ro
+    ports:
+      - "5601:5601"
+    networks:
+      - monitoring
+
+
+# ---------------- VOLUMES ----------------
+volumes:
+  pg_prod_data:
+  redis_data:
+  es_data_prod:
+
+# ---------------- NETWORKS ----------------
+networks:
+  backend:
+    driver: bridge
+  monitoring:
+    driver: bridge

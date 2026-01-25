@@ -1,0 +1,92 @@
+import express, { type Express } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import cookieParser from "cookie-parser";
+import authRoutes from "./modules/auth/auth.routes.js";
+import incidentsRoutes from "./modules/incidents/incidents.routes.js";
+import { requestContext } from "./shared/middleware/request-context.middleware.js";
+import { notFound } from "./shared/errors/notFound.js";
+import { errorHandler } from "./shared/errors/errorHandler.js";
+import { requestId } from "./shared/middleware/requestId.middleware.js";
+import { requestLogger } from "./shared/middleware/requestLogger.middleware.js";
+import { register } from "./config/metrics.js";
+import { logger } from "./config/logger.js";
+import { errorMetrics } from "./shared/errors/metrics/errorMetrics.js";
+
+export function createApp(): Express {
+  const app = express();
+
+  // Middleware
+  app.use(
+    helmet({
+      contentSecurityPolicy: true,
+      crossOriginEmbedderPolicy: true,
+    })
+  );
+  app.use(cors({ credentials: true, origin: true }));
+  app.use(morgan("dev"));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
+  app.set("trust proxy", true);
+
+  // Pipe Morgan into structured logger (JSON)
+  // app.use(
+  //   morgan("combined", {
+  //     stream: {
+  //       write: (msg) => {
+  //         const log = parseCombinedLog(msg);
+  //         logger.info(log);
+  //       },
+  //     },
+  //   })
+  // );
+
+  app.use((req, res, next) => {
+    logger.info({ method: req.method, url: req.url });
+    next();
+  });
+
+  // GLOBAL MIDDLEWARE
+  app.use(requestContext);
+  app.use(requestId);
+  app.use(requestLogger);
+  // 100 requests per 60 seconds
+  // app.use(rateLimiter({ window: 60, limit: 5 }));
+
+  // Routes
+  app.use("/api/auth", authRoutes);
+  app.use("/api/incidents", incidentsRoutes);
+
+  // Health check
+  app.get("/health", (_, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  app.get("/", (req, res) => {
+    res.send("Hello, world!");
+  });
+
+  //metrics for dev
+  app.get("/metrics", async (_req, res) => {
+    res.set("Content-Type", register.contentType);
+    res.send(await register.metrics());
+  });
+
+  // for dev
+  app.get("/internal/metrics/errors", (_req, res) => {
+    res.json({
+      totalErrors: errorMetrics.totalErrors,
+      byStatus: Object.fromEntries(errorMetrics.byStatus),
+    });
+  });
+
+  // 404 handler
+  app.use(notFound);
+
+  // global error handler
+  app.use(errorHandler);
+
+  return app;
+}

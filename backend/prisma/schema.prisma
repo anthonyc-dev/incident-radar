@@ -1,0 +1,131 @@
+
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =====================
+// Enums
+// =====================
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+}
+
+
+// =======================
+// AUTH & USERS
+// =======================
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  incidents    Incidents[]
+  incidentStatusLogs IncidentStatusLogs[]
+
+  @@index([id])
+  @@index([email])
+}
+
+
+model RefreshToken {
+  id            String   @id @default(uuid())
+  sessionId     String
+  userId        String
+  deviceId      String       
+  ipAddress     String      
+  userAgent     String       
+  tokenHash     String   @unique
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  replacedById  String?
+  createdAt     DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+// =======================
+// AUDIT LOGS
+// =======================
+model AuditLog {
+  id                String   @id @default(uuid())
+  type              String
+  severity          String
+  actorId           String
+  actorRole         String
+  userId            String
+  email             String?
+  tokenHash         String?
+  sessionId         String?
+  reason            String?
+  ip                String
+  userAgent         String
+  deviceFingerprint String
+  requestId         String
+  timestamp         BigInt
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([timestamp])
+  @@index([actorId])
+}
+
+// =======================
+// INCIDENTS
+// =======================
+model Incidents {
+  id                String   @id @default(uuid())
+  title             String
+  description       String
+  severity          IncidentSeverity  
+  status            IncidentStatus   @default(OPEN)    
+  created_by        String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  incidentStatusLogs IncidentStatusLogs[]
+
+  User              User        @relation(fields: [created_by], references: [id])
+
+  @@index([id])
+  @@index([status])
+  @@index([severity])
+}
+
+
+// =======================
+// INCIDENTS STATUS LOGS
+// =======================
+model IncidentStatusLogs {
+  id                String   @id @default(uuid())
+  incident_id       String     
+  old_status        IncidentStatus
+  new_status        IncidentStatus
+  changed_by        String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  incident          Incidents        @relation(fields: [incident_id], references: [id])
+  User              User        @relation(fields: [changed_by], references: [id])
+
+
+  @@index([id])
+}
+

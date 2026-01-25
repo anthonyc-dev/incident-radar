@@ -1,0 +1,169 @@
+services:
+  # ------------------ APP ------------------
+  api:
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: express_dev
+    ports:
+      - "3000:3000"
+      - "51212:51212"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+        ]
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npx nodemon --exec npm run dev
+    depends_on:
+      - db
+      - redis
+    networks:
+      - backend
+      - monitoring   
+
+  # ------------------ REDIS ------------------
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--requirepass", "anthony",
+        "--appendonly",
+        "no",
+      ]
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - backend
+    restart: always
+
+  # ------------------ POSTGRES ------------------
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_dev
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_dev_data:/var/lib/postgresql/data
+    mem_limit: 512m
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c max_connections=50
+      -c effective_cache_size=256MB
+    restart: always
+    networks:
+      - backend
+
+  # ------------------ MONITORING ------------------
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "9093:9093"
+    restart: always
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-lifecycle"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    restart: always
+    depends_on:
+      - alertmanager
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "4000:3000"
+    depends_on:
+      - prometheus
+    command: >
+      /bin/sh -c "rm -rf /usr/share/grafana/public/explore /usr/share/grafana/public/img /usr/share/grafana/public/vendor || true && /run.sh"
+    restart: always
+    networks:
+      - monitoring
+
+  # ---------------- LOGGER ----------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: elasticsearch_dev
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g 
+      - xpack.security.enabled=false 
+    volumes:
+      - es_data_dev:/usr/share/elasticsearch/data
+      - ./elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/elasticsearch/elasticsearch.yml:ro
+    ports:
+      - "9200:9200"
+    networks:
+      - monitoring
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: kibana_dev
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_HOST=0.0.0.0
+    volumes:
+      - ./elasticsearch/kibana.yml:/usr/share/kibana/elasticsearch/kibana.yml:ro
+    ports:
+      - "5601:5601"
+    networks:
+      - monitoring
+
+# ---------------- VOLUMES ----------------
+volumes:
+  pg_dev_data:
+  redis_dev_data:
+  node_modules:
+  es_data_dev:
+
+# ---------------- NETWORKS ----------------
+networks:
+  backend:
+    driver: bridge
+  monitoring:
+    driver: bridge
