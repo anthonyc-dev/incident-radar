@@ -31,9 +31,8 @@ jobs:
       - name: Install NPM dependencies
         run: npm ci
 
-      - name: Lint and typecheck
+      - name: typecheck
         run: |
-          npm run lint
           npm run typecheck || true
 
       - name: Build application

@@ -404,7 +404,7 @@ export class IncidentsService {
       throw new ApiError(404, "Incident not found", "INCIDENT_NOT_FOUND");
     }
 
-    // Get all activity logss
+    // Get all activity logs
     const activityLogs = await prisma.incidentActivityLogs.findMany({
       where: { incident_id: id },
       orderBy: { createdAt: "asc" },
