@@ -11,13 +11,13 @@ services:
       - "51212:51212"
     env_file:
       - .env
-    depends_on:
-      - db
-      - redis
     networks:
       - backend
       - monitoring   
     restart: always
+    depends_on:
+      - db
+      - redis
 
   # ------------------ REDIS ------------------
   redis:
