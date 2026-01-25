@@ -104,3 +104,10 @@ export const getStatusHistorySchema = z.object({
     id: uuidSchema,
   }),
 });
+
+// GET /api/incidents/:id/activity - Get activity history
+export const getActivityHistorySchema = z.object({
+  params: z.object({
+    id: uuidSchema,
+  }),
+});

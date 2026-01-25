@@ -66,6 +66,7 @@ import {
   type IncidentSeverity,
   type IncidentStatus,
   type IncidentHistoryEntry,
+  type IncidentActivityEntry,
 } from "@/lib/incidents-api";
 const ITEMS_PER_PAGE = 10;
 
@@ -89,6 +90,7 @@ const Incident = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [history, setHistory] = useState<IncidentHistoryEntry[]>([]);
+  const [activityHistory, setActivityHistory] = useState<IncidentActivityEntry[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isCreateSubmitting, setIsCreateSubmitting] = useState(false);
   const [isUpdateSubmitting, setIsUpdateSubmitting] = useState(false);
@@ -266,12 +268,20 @@ const Incident = () => {
   const openHistoryDialog = (incident: Incident) => {
     setSelectedIncident(incident);
     setHistory([]);
+    setActivityHistory([]);
     setIsHistoryOpen(true);
     setIsHistoryLoading(true);
+    // Load comprehensive activity history
     incidentsApi
-      .getHistory(incident.id)
-      .then(setHistory)
-      .catch(() => toast.error("Failed to load history"))
+      .getActivity(incident.id)
+      .then(setActivityHistory)
+      .catch(() => {
+        // Fallback to status history if activity endpoint fails
+        incidentsApi
+          .getHistory(incident.id)
+          .then(setHistory)
+          .catch(() => toast.error("Failed to load history"));
+      })
       .finally(() => setIsHistoryLoading(false));
   };
 
@@ -682,9 +692,9 @@ const Incident = () => {
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Incident History</DialogTitle>
+            <DialogTitle>Incident Activity History</DialogTitle>
             <DialogDescription>
-              Status change history for incident <span className="font-medium">{selectedIncident?.title ?? "—"}</span>
+              Complete activity timeline for incident <span className="font-medium">{selectedIncident?.title ?? "—"}</span>
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -692,50 +702,132 @@ const Incident = () => {
               <div className="flex justify-center py-8">
                 <Spinner className="h-8 w-8" />
               </div>
-            ) : history.length === 0 && !selectedIncident ? (
+            ) : activityHistory.length === 0 && history.length === 0 && !selectedIncident ? (
               <p className="text-muted-foreground text-sm py-4">
-                No status changes yet.
+                No activity history available.
               </p>
             ) : (
               <div className="border-l-2 border-muted pl-4 space-y-4">
-                {[...history].reverse().map((h, idx) => (
-                  <div key={idx} className="relative">
-                    <div className="absolute -left-5.25 top-0 h-3 w-3 rounded-full border-2 border-background bg-amber-700" />
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">
-                          {h.oldStatus} → {h.newStatus}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(h.changedAt), {
-                            addSuffix: true,
-                          })}
-                        </p>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        by {h.changedByName ?? "—"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {selectedIncident && (
-                  <div className="relative">
-                    <div className="absolute -left-5.25 top-0 h-3 w-3 rounded-full border-2 border-background bg-amber-700" />
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">
-                          Opened by {selectedIncident.User?.name ?? "—"}
-                        </p>
-                        {selectedIncident.createdAt && (
+                {/* Show activity history if available, otherwise fallback to status history */}
+                {activityHistory.length > 0 ? (
+                  [...activityHistory].reverse().map((activity) => {
+                    const getActivityIcon = () => {
+                      switch (activity.activity_type) {
+                        case "CREATED":
+                          return "🎯";
+                        case "RESOLVED":
+                          return "✅";
+                        case "STATUS_CHANGED":
+                          return "🔄";
+                        case "UPDATED":
+                          return "✏️";
+                        default:
+                          return "📝";
+                      }
+                    };
+
+                    const getActivityColor = () => {
+                      switch (activity.activity_type) {
+                        case "CREATED":
+                          return "bg-blue-500";
+                        case "RESOLVED":
+                          return "bg-green-500";
+                        case "STATUS_CHANGED":
+                          return "bg-amber-700";
+                        case "UPDATED":
+                          return "bg-purple-500";
+                        default:
+                          return "bg-gray-500";
+                      }
+                    };
+
+                    const getActivityTitle = () => {
+                      switch (activity.activity_type) {
+                        case "CREATED":
+                          return "Incident Created";
+                        case "RESOLVED":
+                          return "Incident Resolved";
+                        case "STATUS_CHANGED":
+                          return "Status Changed";
+                        case "UPDATED":
+                          return "Incident Updated";
+                        default:
+                          return "Activity";
+                      }
+                    };
+
+                    return (
+                      <div key={activity.id} className="relative">
+                        <div className={`absolute -left-5.25 top-0 h-3 w-3 rounded-full border-2 border-background ${getActivityColor()}`} />
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{getActivityIcon()}</span>
+                              <p className="text-sm font-medium">
+                                {getActivityTitle()}
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(activity.createdAt), {
+                                addSuffix: true,
+                              })}
+                            </p>
+                          </div>
+                          {activity.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {activity.description}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(selectedIncident.createdAt), {
-                              addSuffix: true,
-                            })}
+                            by <span className="font-medium">{activity.performedByName ?? "Unknown"}</span>
                           </p>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })
+                ) : (
+                  // Fallback to status history
+                  <>
+                    {[...history].reverse().map((h, idx) => (
+                      <div key={idx} className="relative">
+                        <div className="absolute -left-5.25 top-0 h-3 w-3 rounded-full border-2 border-background bg-amber-700" />
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">
+                              {h.oldStatus} → {h.newStatus}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(h.changedAt), {
+                                addSuffix: true,
+                              })}
+                            </p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            by {h.changedByName ?? "—"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {selectedIncident && (
+                      <div className="relative">
+                        <div className="absolute -left-5.25 top-0 h-3 w-3 rounded-full border-2 border-background bg-blue-500" />
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">
+                              Opened by {selectedIncident.User?.name ?? "—"}
+                            </p>
+                            {selectedIncident.createdAt && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(selectedIncident.createdAt), {
+                                  addSuffix: true,
+                                })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

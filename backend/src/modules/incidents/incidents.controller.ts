@@ -106,12 +106,17 @@ export class IncidentsController {
     try {
       const id = req.params.id as string;
       const { title, description, severity } = req.body;
+      const userId = req.user?.sub;
 
-      const incident = await incidentsService.updateIncident(id, {
-        title,
-        description,
-        severity,
-      });
+      const incident = await incidentsService.updateIncident(
+        id,
+        {
+          title,
+          description,
+          severity,
+        },
+        userId
+      );
 
       res.status(200).json(incident);
     } catch (error) {
@@ -194,6 +199,25 @@ export class IncidentsController {
       }
       console.error(error);
       res.status(500).json({ error: "Failed to fetch status history" });
+    }
+  }
+
+  // ---------------- GET ACTIVITY HISTORY ----------------
+  async getActivityHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const history = await incidentsService.getActivityHistory(id);
+      res.status(200).json(history);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        res.status(error.statusCode).json({
+          error: error.message,
+          code: error.code,
+        });
+        return;
+      }
+      console.error(error);
+      res.status(500).json({ error: "Failed to fetch activity history" });
     }
   }
 }

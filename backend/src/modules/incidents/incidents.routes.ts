@@ -10,6 +10,7 @@ import {
   deleteIncidentSchema,
   updateStatusSchema,
   getStatusHistorySchema,
+  getActivityHistorySchema,
 } from "./incidents.schema.js";
 
 const router = Router();
@@ -64,6 +65,13 @@ router.get(
   "/:id/history",
   validate(getStatusHistorySchema),
   incidentsController.getStatusHistory.bind(incidentsController)
+);
+
+// GET /api/incidents/:id/activity - Get activity history
+router.get(
+  "/:id/activity",
+  validate(getActivityHistorySchema),
+  incidentsController.getActivityHistory.bind(incidentsController)
 );
 
 export default router;

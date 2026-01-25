@@ -60,6 +60,16 @@ export interface IncidentHistoryEntry {
   changedByName: string;
 }
 
+export interface IncidentActivityEntry {
+  id: string;
+  activity_type: "CREATED" | "STATUS_CHANGED" | "UPDATED" | "RESOLVED";
+  performed_by: string;
+  performedByName: string;
+  description: string | null;
+  metadata: string | null;
+  createdAt: string;
+}
+
 const BASE = "/api/incidents";
 
 export const incidentsApi = {
@@ -80,4 +90,7 @@ export const incidentsApi = {
 
   getHistory: (id: string) =>
     apiClient.get<IncidentHistoryEntry[]>(`${BASE}/${id}/history`).then((r) => r.data),
+
+  getActivity: (id: string) =>
+    apiClient.get<IncidentActivityEntry[]>(`${BASE}/${id}/activity`).then((r) => r.data),
 };

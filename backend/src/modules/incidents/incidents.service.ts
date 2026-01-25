@@ -36,6 +36,16 @@ export interface StatusHistoryEntry {
   changedByName: string;
 }
 
+export interface ActivityLogEntry {
+  id: string;
+  activity_type: string;
+  performed_by: string;
+  performedByName: string;
+  description: string | null;
+  metadata: string | null;
+  createdAt: Date;
+}
+
 export class IncidentsService {
   // ---------------- GET ALL INCIDENTS ----------------
   async getIncidents(query: GetIncidentsQuery, userId?: string) {
@@ -130,30 +140,49 @@ export class IncidentsService {
       throw new ApiError(404, "User not found", "USER_NOT_FOUND");
     }
 
-    const incident = await prisma.incidents.create({
-      data: {
-        title: input.title,
-        description: input.description,
-        severity: input.severity,
-        status: "OPEN",
-        created_by: input.createdBy,
-      },
-      include: {
-        User: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    const incident = await prisma.$transaction(async (tx) => {
+      // Create incident
+      const newIncident = await tx.incidents.create({
+        data: {
+          title: input.title,
+          description: input.description,
+          severity: input.severity,
+          status: "OPEN",
+          created_by: input.createdBy,
+        },
+        include: {
+          User: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      // Log creation activity
+      await tx.incidentActivityLogs.create({
+        data: {
+          incident_id: newIncident.id,
+          activity_type: "CREATED",
+          performed_by: input.createdBy,
+          description: `Incident "${input.title}" was created`,
+          metadata: JSON.stringify({
+            severity: input.severity,
+            status: "OPEN",
+          }),
+        },
+      });
+
+      return newIncident;
     });
 
     return incident;
   }
 
   // ---------------- UPDATE INCIDENT ----------------
-  async updateIncident(id: string, input: UpdateIncidentInput) {
+  async updateIncident(id: string, input: UpdateIncidentInput, updatedBy?: string) {
     // Check if incident exists
     const existingIncident = await prisma.incidents.findUnique({
       where: { id },
@@ -163,22 +192,59 @@ export class IncidentsService {
       throw new ApiError(404, "Incident not found", "INCIDENT_NOT_FOUND");
     }
 
-    const incident = await prisma.incidents.update({
-      where: { id },
-      data: {
-        ...(input.title && { title: input.title }),
-        ...(input.description && { description: input.description }),
-        ...(input.severity && { severity: input.severity }),
-      },
-      include: {
-        User: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    // Track changes
+    const changes: string[] = [];
+    const metadata: Record<string, any> = {};
+
+    if (input.title && input.title !== existingIncident.title) {
+      changes.push(`title changed from "${existingIncident.title}" to "${input.title}"`);
+      metadata.title = { old: existingIncident.title, new: input.title };
+    }
+
+    if (input.description && input.description !== existingIncident.description) {
+      changes.push("description was updated");
+      metadata.description = { updated: true };
+    }
+
+    if (input.severity && input.severity !== existingIncident.severity) {
+      changes.push(`severity changed from ${existingIncident.severity} to ${input.severity}`);
+      metadata.severity = { old: existingIncident.severity, new: input.severity };
+    }
+
+    const incident = await prisma.$transaction(async (tx) => {
+      // Update incident
+      const updatedIncident = await tx.incidents.update({
+        where: { id },
+        data: {
+          ...(input.title && { title: input.title }),
+          ...(input.description && { description: input.description }),
+          ...(input.severity && { severity: input.severity }),
+        },
+        include: {
+          User: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      // Log update activity if there are changes and user is provided
+      if (changes.length > 0 && updatedBy) {
+        await tx.incidentActivityLogs.create({
+          data: {
+            incident_id: id,
+            activity_type: "UPDATED",
+            performed_by: updatedBy,
+            description: changes.join(", "),
+            metadata: JSON.stringify(metadata),
+          },
+        });
+      }
+
+      return updatedIncident;
     });
 
     return incident;
@@ -235,7 +301,7 @@ export class IncidentsService {
       return await this.getIncidentById(incidentId);
     }
 
-    // Update status and create log in a transaction
+    // Update status and create logs in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Update incident status
       const updatedIncident = await tx.incidents.update({
@@ -252,13 +318,32 @@ export class IncidentsService {
         },
       });
 
-      // Create status log entry
+      // Create status log entry (for backward compatibility)
       await tx.incidentStatusLogs.create({
         data: {
           incident_id: incidentId,
           old_status: oldStatus,
           new_status: newStatus,
           changed_by: changedBy,
+        },
+      });
+
+      // Create activity log entry
+      const activityType = newStatus === "RESOLVED" ? "RESOLVED" : "STATUS_CHANGED";
+      const description = newStatus === "RESOLVED" 
+        ? `Incident was resolved (status changed from ${oldStatus} to ${newStatus})`
+        : `Status changed from ${oldStatus} to ${newStatus}`;
+
+      await tx.incidentActivityLogs.create({
+        data: {
+          incident_id: incidentId,
+          activity_type: activityType,
+          performed_by: changedBy,
+          description,
+          metadata: JSON.stringify({
+            oldStatus,
+            newStatus,
+          }),
         },
       });
 
@@ -298,6 +383,66 @@ export class IncidentsService {
       changedAt: log.createdAt,
       changedByName: log.User?.name ?? "Unknown",
     }));
+  }
+
+  // ---------------- GET ACTIVITY HISTORY ----------------
+  async getActivityHistory(id: string): Promise<ActivityLogEntry[]> {
+    const incident = await prisma.incidents.findUnique({
+      where: { id },
+      include: {
+        User: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!incident) {
+      throw new ApiError(404, "Incident not found", "INCIDENT_NOT_FOUND");
+    }
+
+    // Get all activity logs
+    const activityLogs = await prisma.incidentActivityLogs.findMany({
+      where: { incident_id: id },
+      orderBy: { createdAt: "asc" },
+      include: {
+        User: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Build activity history with creation event first
+    const activities: ActivityLogEntry[] = [
+      {
+        id: `creation-${incident.id}`,
+        activity_type: "CREATED",
+        performed_by: incident.created_by,
+        performedByName: incident.User?.name ?? "Unknown",
+        description: `Incident "${incident.title}" was created`,
+        metadata: JSON.stringify({
+          severity: incident.severity,
+          status: incident.status,
+        }),
+        createdAt: incident.createdAt,
+      },
+      ...activityLogs.map((log) => ({
+        id: log.id,
+        activity_type: log.activity_type,
+        performed_by: log.performed_by,
+        performedByName: log.User?.name ?? "Unknown",
+        description: log.description,
+        metadata: log.metadata,
+        createdAt: log.createdAt,
+      })),
+    ];
+
+    return activities;
   }
 }
 

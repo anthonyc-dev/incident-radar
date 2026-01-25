@@ -38,6 +38,7 @@ model User {
 
   incidents    Incidents[]
   incidentStatusLogs IncidentStatusLogs[]
+  incidentActivityLogs IncidentActivityLogs[]
 
   @@index([id])
   @@index([email])
@@ -101,6 +102,7 @@ model Incidents {
   updatedAt         DateTime @updatedAt
 
   incidentStatusLogs IncidentStatusLogs[]
+  incidentActivityLogs IncidentActivityLogs[]
 
   User              User        @relation(fields: [created_by], references: [id])
 
@@ -127,5 +129,26 @@ model IncidentStatusLogs {
 
 
   @@index([id])
+}
+
+// =======================
+// INCIDENTS ACTIVITY LOGS
+// =======================
+model IncidentActivityLogs {
+  id                String   @id @default(uuid())
+  incident_id       String
+  activity_type     String   // CREATED, STATUS_CHANGED, UPDATED, RESOLVED
+  performed_by      String
+  description       String?  // Human-readable description
+  metadata          String?  // JSON string for additional data (old/new values, etc.)
+  createdAt         DateTime @default(now())
+
+  incident          Incidents        @relation(fields: [incident_id], references: [id])
+  User              User        @relation(fields: [performed_by], references: [id])
+
+  @@index([incident_id])
+  @@index([performed_by])
+  @@index([activity_type])
+  @@index([createdAt])
 }
 
