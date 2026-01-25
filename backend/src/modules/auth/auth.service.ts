@@ -20,6 +20,7 @@ import {
   releaseUserLock,
 } from "../../shared/session/redisSession.js";
 import { randomUUID } from "crypto";
+import type { Prisma } from "../../generated/prisma/client.js";
 
 const MAX_SESSIONS = 5;
 
@@ -32,7 +33,7 @@ export class AuthService {
     userAgent,
     ipAddress,
   }: LoginInput): Promise<AuthResponse> {
- 
+
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user)
       throw new ApiError(
@@ -49,7 +50,6 @@ export class AuthService {
         "AUTH_INVALID_CREDENTIALS"
       );
 
-
     const lockAcquired = await acquireUserLock(user.id, 5000);
     if (!lockAcquired) {
       throw new ApiError(
@@ -60,13 +60,11 @@ export class AuthService {
     }
 
     try {
-
       const allSessionIds = await getUserSessions(user.id);
-
 
       const validSessions: string[] = [];
       const expiredSessionIds: string[] = [];
-      
+
       for (const sId of allSessionIds) {
         const sess = await getSession(sId);
         if (sess) {
@@ -76,11 +74,9 @@ export class AuthService {
         }
       }
 
-
       for (const sId of expiredSessionIds) {
         await revokeSession(sId, user.id);
       }
-
 
       let oldestSessionId: string | null = null;
       if (validSessions.length >= MAX_SESSIONS) {
@@ -94,7 +90,6 @@ export class AuthService {
         }
       }
 
-  
       const sameDeviceSessionIds: string[] = [];
       for (const sId of validSessions) {
         const sess = await getSession(sId);
@@ -103,7 +98,6 @@ export class AuthService {
         }
       }
 
- 
       const sessionId = randomUUID();
       const refreshToken = generateRefreshToken();
       const refreshTokenExpiresAt = new Date(
@@ -111,8 +105,8 @@ export class AuthService {
       );
 
       const result = await prisma.$transaction(
-        async (tx) => {
-    
+        async (tx: Prisma.TransactionClient) => {
+
           const userInTx = await tx.user.findUnique({ where: { id: user.id } });
           if (!userInTx) {
             throw new ApiError(404, "User not found", "AUTH_USER_NOT_FOUND");
@@ -120,7 +114,6 @@ export class AuthService {
 
           const now = new Date();
 
-  
           if (oldestSessionId) {
             await tx.refreshToken.updateMany({
               where: {
@@ -131,7 +124,6 @@ export class AuthService {
               data: { revokedAt: now },
             });
           }
-
 
           if (sameDeviceSessionIds.length > 0) {
             await tx.refreshToken.updateMany({
@@ -171,11 +163,10 @@ export class AuthService {
           return { user: userInTx };
         },
         {
-          maxWait: 5000, 
-          timeout: 10000, 
+          maxWait: 5000,
+          timeout: 10000,
         }
       );
-
 
       const redisSessionIdsToRevoke = new Set<string>();
       if (oldestSessionId) {
@@ -183,7 +174,6 @@ export class AuthService {
       }
       sameDeviceSessionIds.forEach((id) => redisSessionIdsToRevoke.add(id));
 
-   
       const revokedTokens = await prisma.refreshToken.findMany({
         where: {
           userId: user.id,
@@ -195,16 +185,14 @@ export class AuthService {
         distinct: ["sessionId"],
       });
 
-      revokedTokens.forEach((token) => {
+      revokedTokens.forEach((token: { sessionId: string }) => {
         redisSessionIdsToRevoke.add(token.sessionId);
       });
 
-    
       for (const sId of redisSessionIdsToRevoke) {
         await revokeSession(sId, user.id);
       }
 
-  
       await createSession(sessionId, {
         userId: result.user.id,
         deviceId,
@@ -214,13 +202,11 @@ export class AuthService {
         lastUsedAt: Date.now(),
       });
 
-  
       return {
         user: {
           id: result.user.id,
           email: result.user.email,
           name: result.user.name,
-     
         },
         accessToken: signAccessToken(result.user),
         refreshToken,
@@ -242,14 +228,13 @@ export class AuthService {
       ipAddress = "unknown",
     } = input;
 
-    if (!name || !email || !password )
+    if (!name || !email || !password)
       throw new ApiError(
         400,
         "Missing required fields",
         "AUTH_REGISTER_MISSING_FIELDS"
       );
 
- 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing)
       throw new ApiError(
@@ -258,13 +243,11 @@ export class AuthService {
         "AUTH_EMAIL_ALREADY_REGISTERED"
       );
 
-  
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { name, email, password: hashed, },
+      data: { name, email, password: hashed },
     });
 
-  
     const sessionId = randomUUID();
     await createSession(sessionId, {
       userId: user.id,
@@ -275,7 +258,6 @@ export class AuthService {
       lastUsedAt: Date.now(),
     });
 
- 
     const refreshToken = generateRefreshToken();
     await prisma.refreshToken.create({
       data: {
@@ -301,19 +283,21 @@ export class AuthService {
   }
 
   // ---------------- REFRESH TOKEN ----------------
-  async refreshToken(oldRefreshToken: string, deviceId: string, ipAddress: string, userAgent: string) {
+  async refreshToken(
+    oldRefreshToken: string,
+    deviceId: string,
+    ipAddress: string,
+    userAgent: string
+  ) {
     const tokenHash = hashToken(oldRefreshToken);
-  
-    return await prisma.$transaction(async (tx) => {
-  
+
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const storedToken = await tx.refreshToken.findUnique({
         where: { tokenHash },
       });
-  
+
       if (!storedToken || storedToken.revokedAt) {
- 
         if (storedToken) {
-  
           const sess = await getSession(storedToken.sessionId);
           if (sess) await revokeSession(storedToken.sessionId, sess.userId);
         }
@@ -323,40 +307,35 @@ export class AuthService {
           "AUTH_REFRESH_TOKEN_REUSE"
         );
       }
-  
-  
-      let session = await getSession(storedToken.sessionId);
-  
-      if (!session) {
 
+      let session = await getSession(storedToken.sessionId);
+
+      if (!session) {
         const user = await tx.user.findUnique({ where: { id: storedToken.userId } });
         if (!user) {
           throw new ApiError(404, "User not found", "AUTH_USER_NOT_FOUND");
         }
-  
-   
+
         session = await createSession(storedToken.sessionId, {
-          sessionId: storedToken.sessionId, 
+          sessionId: storedToken.sessionId,
           userId: storedToken.userId,
           deviceId: session?.deviceId || deviceId,
-          userAgent: session?.userAgent || userAgent, 
+          userAgent: session?.userAgent || userAgent,
           ipAddress: session?.ipAddress || ipAddress,
           createdAt: session?.createdAt || Date.now(),
           lastUsedAt: Date.now(),
         });
       }
-  
-   
+
       if (session.deviceId !== deviceId) {
         throw new ApiError(403, "Device mismatch", "AUTH_DEVICE_MISMATCH");
       }
-  
 
       await createSession(storedToken.sessionId, {
         ...session,
         lastUsedAt: Date.now(),
       });
-  
+
       // Rotate refresh token
       const newRefreshToken = generateRefreshToken();
       const newToken = await tx.refreshToken.create({
@@ -367,16 +346,15 @@ export class AuthService {
           userAgent,
           ipAddress,
           tokenHash: hashToken(newRefreshToken),
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
       });
-  
+
       await tx.refreshToken.update({
         where: { id: storedToken.id },
         data: { revokedAt: new Date(), replacedById: newToken.id },
       });
-  
-   
+
       const user = await tx.user.findUnique({ where: { id: session.userId } });
       if (!user) {
         throw new ApiError(404, "User not found", "AUTH_USER_NOT_FOUND");
@@ -389,7 +367,7 @@ export class AuthService {
       };
     });
   }
-  
+
   //-----------------Protection Route------------------
   getProfileFromRequest(req: {
     user?: { sub: string; role: string; exp: Date };
@@ -401,7 +379,7 @@ export class AuthService {
     if (!req.user) {
       throw new ApiError(401, "Unauthorized", "AUTH_UNAUTHORIZED");
     }
- 
+
     return {
       sub: req.user.sub,
       role: req.user.role,

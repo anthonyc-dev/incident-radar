@@ -1,6 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
-import type { IncidentSeverity, IncidentStatus } from "../../generated/prisma/enums.js";
+import type { Prisma } from "../../generated/prisma/client.js";
+import type { IncidentSeverity, IncidentStatus } from "./incidents.types.js";
 
 export interface CreateIncidentInput {
   title: string;
@@ -72,7 +73,6 @@ export class IncidentsService {
       where.severity = severity;
     }
 
-
     if (userId) {
       where.created_by = userId;
     }
@@ -140,7 +140,7 @@ export class IncidentsService {
       throw new ApiError(404, "User not found", "USER_NOT_FOUND");
     }
 
-    const incident = await prisma.$transaction(async (tx) => {
+    const incident = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create incident
       const newIncident = await tx.incidents.create({
         data: {
@@ -211,7 +211,7 @@ export class IncidentsService {
       metadata.severity = { old: existingIncident.severity, new: input.severity };
     }
 
-    const incident = await prisma.$transaction(async (tx) => {
+    const incident = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Update incident
       const updatedIncident = await tx.incidents.update({
         where: { id },
@@ -264,7 +264,6 @@ export class IncidentsService {
       where: { incident_id: id },
     });
 
-
     await prisma.incidents.delete({
       where: { id },
     });
@@ -302,7 +301,7 @@ export class IncidentsService {
     }
 
     // Update status and create logs in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Update incident status
       const updatedIncident = await tx.incidents.update({
         where: { id: incidentId },
@@ -376,7 +375,13 @@ export class IncidentsService {
       },
     });
 
-    return logs.map((log) => ({
+    return logs.map((log: {
+      old_status: IncidentStatus;
+      new_status: IncidentStatus;
+      changed_by: string;
+      createdAt: Date;
+      User?: { name?: string | null } | null;
+    }) => ({
       oldStatus: log.old_status,
       newStatus: log.new_status,
       changed_by: log.changed_by,
@@ -431,7 +436,15 @@ export class IncidentsService {
         }),
         createdAt: incident.createdAt,
       },
-      ...activityLogs.map((log) => ({
+      ...activityLogs.map((log: {
+        id: string;
+        activity_type: string;
+        performed_by: string;
+        User?: { name?: string | null } | null;
+        description: string | null;
+        metadata: string | null;
+        createdAt: Date;
+      }) => ({
         id: log.id,
         activity_type: log.activity_type,
         performed_by: log.performed_by,

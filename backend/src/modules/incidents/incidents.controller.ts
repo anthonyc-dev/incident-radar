@@ -1,7 +1,9 @@
 import { type Request, type Response } from "express";
 import { incidentsService } from "./incidents.service.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
-import type { IncidentSeverity, IncidentStatus } from "../../generated/prisma/enums.js";
+import type { IncidentSeverity, IncidentStatus } from "./incidents.types.js";
+
+
 
 export class IncidentsController {
   // ---------------- GET ALL INCIDENTS ----------------
