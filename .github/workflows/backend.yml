@@ -1,0 +1,51 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+  pull_request:
+    paths:
+      - "backend/**"
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Lint and typecheck
+        run: |
+          npm run lint
+          npm run typecheck || true
+
+      - name: Build application
+        run: npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: incident-radar-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run npm audit for vulnerability scanning
+        run: npm audit --audit-level=high || true
