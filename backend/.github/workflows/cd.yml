@@ -1,22 +1,25 @@
-# name: Deploy
+name: CD
 
-# on:
-#   push:
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - main
 
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#       - name: Install Node.js
-#         uses: actions/setup-node@v3
-#         with:
-#           node-version: 20
-#       - run: npm install
-#       - run: npx prisma migrate deploy
-#       - run: npx prisma generate
-#       - run: npm run build
-#       - name: Restart Server
-#         run: pm2 restart my-app || systemctl restart my-app.service
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: incident-radar-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
