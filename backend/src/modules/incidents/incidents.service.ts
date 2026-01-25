@@ -6,7 +6,7 @@ import type { ActivityLogEntry, CreateIncidentInput, GetIncidentsQuery, Incident
 
 
 export class IncidentsService {
-  // ---------------- GET ALL INCIDENTS ----------------
+  // ---------------- GET ALL INCIDENTSs ----------------
   async getIncidents(query: GetIncidentsQuery, userId?: string) {
     const {
       status,
