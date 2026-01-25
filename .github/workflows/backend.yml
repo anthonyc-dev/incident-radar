@@ -31,6 +31,9 @@ jobs:
       - name: Install NPM dependencies
         run: npm ci
 
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: typecheck
         run: |
           npm run typecheck || true
