@@ -127,7 +127,7 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Recent Incidents */}
+      {/* Recent Incidentss */}
       <Card>
         <CardContent>
           <div className="flex items-center justify-between mb-2">
