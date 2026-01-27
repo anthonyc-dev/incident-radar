@@ -32,13 +32,6 @@ export function Navbar() {
 
                 {/* Right side */}
                 <div className="flex items-center space-x-4">
-                    {/* <Button variant="ghost" size="sm" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive text-xs">
-              <span className="sr-only">Notifications</span>
-            </span>
-          </Button> */}
-
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
