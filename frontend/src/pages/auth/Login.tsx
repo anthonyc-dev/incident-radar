@@ -11,8 +11,8 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
 import { isAxiosError } from "axios";
+import { useAuth } from "@/hooks/useAuth";
 
 const Login = () => {
   const { login, error, clearError } = useAuth();
@@ -20,15 +20,14 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     clearError();
 
     try {
-      await login(email.trim(), password);
-      toast.success("Welcome back!");
-      // PublicRoute redirects to /home when user is set
+      await login(email, password);
+      // PublicRoute redirects to /home when accessToken is set (same render, no race)
     } catch (err) {
       const message = isAxiosError(err)
         ? (err.response?.data as { error?: string })?.error ?? err.message
@@ -36,8 +35,10 @@ const Login = () => {
       toast.error(message);
     } finally {
       setLoading(false);
+
     }
-  };
+  }
+
 
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">

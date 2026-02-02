@@ -1,4 +1,4 @@
-import { LogOut, MoreVertical } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Navbar() {
     const navigate = useNavigate();
@@ -35,7 +35,7 @@ export function Navbar() {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
+                                <LogOut className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

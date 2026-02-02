@@ -13,14 +13,18 @@ COPY package*.json ./
 # Install all dependencies (dev + prod)
 RUN npm ci
 
-# Copy full source code
-COPY . .
+# Copy Prisma schema and config first (required for prisma generate)
+COPY prisma ./prisma
+COPY prisma.config.ts ./
 
 # Dummy DATABASE_URL for prisma generate (no .env in build; prisma.config uses it)
 ENV DATABASE_URL=postgresql://user:pass@localhost:5432/dummy
 
 # Generate Prisma client
 RUN npx prisma generate
+
+# Copy full source code
+COPY . .
 
 # Build the project
 RUN npm run build
