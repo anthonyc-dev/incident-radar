@@ -1,17 +1,16 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
 import { isAxiosError } from "axios";
+import { useAuth } from "@/hooks/useAuth";
 
 const Register = () => {
   const { register, error, clearError } = useAuth();
-  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,8 +32,7 @@ const Register = () => {
     try {
       await register(name.trim(), email.trim(), password);
       toast.success("Account created successfully! Welcome!");
-      // Navigation will happen automatically via PublicRoute when user is set
-      navigate("/home");
+      // PublicRoute redirects to /home when accessToken is set (same render, no race)
     } catch (err) {
       const message = isAxiosError(err)
         ? (err.response?.data as { error?: string })?.error ?? err.message
@@ -61,7 +59,7 @@ const Register = () => {
             Welcome to Incident Radar
           </h2>
           <p className="text-lg text-amber-900 max-w-md text-center font-medium mb-3 drop-shadow-sm">
-             Create a free account and start managing incidents today. <span className="text-amber-600 font-bold">Sign up</span> to access your dashboard!
+            Create a free account and start managing incidents today. <span className="text-amber-600 font-bold">Sign up</span> to access your dashboard!
           </p>
           <span className="inline-block px-4 py-1 bg-amber-300/40 rounded-full text-sm font-semibold shadow-sm text-amber-800 mt-1">
             Your radar, your control. Instantly. 🚨
@@ -157,8 +155,8 @@ const Register = () => {
                   disabled={loading}
                 />
               </div>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full mt-4 bg-amber-700 hover:bg-amber-800 text-white font-semibold"
                 disabled={loading}
               >

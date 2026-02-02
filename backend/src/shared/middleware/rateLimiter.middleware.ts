@@ -19,14 +19,16 @@ export const rateLimiter = ({
 
       const tx = redisClient.multi();
       tx.zRemRangeByScore(key, 0, now - window * 1000);
-      tx.zAdd(key, { score: now, value: `${now}-${Math.random()}` });
+      tx.zAdd(key, { score: now, value: crypto.randomUUID() });
       tx.zCard(key);
       tx.expire(key, window + 5);
 
       const results = await tx.exec();
       if (!results || results.length < 3) return next();
 
-      const count = results[2] as number;
+      // const count = results[2] as number;
+
+      const [, , count] = results as [any, any, number];
 
       if (count >= limit) {
         //--- audit log

@@ -103,7 +103,7 @@ const Dashboard = () => {
       {/* About Incident Radar */}
       <div>
         <h2 className="text-3xl font-bold text-amber-900 tracking-tight mb-1">
-          Overview
+          Dashboard
         </h2>
 
       </div>
@@ -127,7 +127,7 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Recent Incidents */}
+      {/* Recent Incidentss */}
       <Card>
         <CardContent>
           <div className="flex items-center justify-between mb-2">

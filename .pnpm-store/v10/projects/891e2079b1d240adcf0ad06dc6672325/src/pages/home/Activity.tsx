@@ -160,7 +160,7 @@ const Activity = () => {
     <div className="flex flex-col gap-8 w-full">
       <div>
         <h2 className="text-3xl font-bold text-amber-900 dark:text-amber-100 tracking-tight mb-2">
-          Activity Feed
+          Activity
         </h2>
       </div>
       <Card>

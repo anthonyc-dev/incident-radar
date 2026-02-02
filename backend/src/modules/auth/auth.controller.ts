@@ -71,7 +71,7 @@ export class AuthController {
         timestamp: Date.now(),
       });
 
-      res.status(200).json({ user: result.user });
+      res.status(200).json({ user: result.user, accessToken: result.accessToken });
     } catch (error) {
       console.error(error);
 
@@ -124,7 +124,7 @@ export class AuthController {
 
       this.setAuthCookies(res, result.accessToken, result.refreshToken);
 
-      res.status(201).json({ user: result.user });
+      res.status(201).json({ user: result.user, accessToken: result.accessToken });
     } catch (error) {
       console.error(error);
       res.status(400).json({ error: "Registration failed" });
@@ -164,7 +164,7 @@ export class AuthController {
         timestamp: Date.now(),
       });
 
-      res.status(200).json({ user: result.user });
+      res.status(200).json({ user: result.user, accessToken: result.accessToken });
     } catch (error) {
       console.error(error);
 

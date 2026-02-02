@@ -1,6 +1,7 @@
 /**
  * Central API client for HTTP requests.
- * - Sends cookies (credentials) for cookie-based auth
+ * - Sends Authorization: Bearer <token> when set (works cross-origin)
+ * - Sends cookies (credentials) for refresh-token
  * - On 401: attempts refresh-token, retries original request, or dispatches session-expired
  * - Deduplicates concurrent 401s into a single refresh
  */
@@ -15,6 +16,20 @@ export const apiClient = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
+});
+
+// In-memory access token so API calls work cross-origin (Bearer header)
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+apiClient.interceptors.request.use((config) => {
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return config;
 });
 
 const REFRESH_PATH = "/api/auth/refresh-token";
@@ -71,7 +86,9 @@ apiClient.interceptors.response.use(
     };
 
     try {
-      await runRefresh();
+      const response = await runRefresh();
+      const token = (response as { data?: { accessToken?: string } })?.data?.accessToken;
+      if (token) setAccessToken(token);
       config._retry = true;
       return apiClient(config);
     } catch {
