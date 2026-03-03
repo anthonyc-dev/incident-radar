@@ -25,7 +25,7 @@ router.get(
   incidentsController.getIncidents.bind(incidentsController)
 );
 
-// POST /api/incidents - Create new incidents
+// POST /api/incidents - Create new incident
 router.post(
   "/",
   validate(createIncidentSchema),
