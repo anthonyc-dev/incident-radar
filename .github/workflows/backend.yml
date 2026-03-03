@@ -26,6 +26,13 @@ jobs:
         with:
           node-version: 20
 
+      - name: ZAP Scan
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a' 
+
       - name: Install NPM dependencies
         run: npm ci
 
